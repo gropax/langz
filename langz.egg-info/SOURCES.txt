@@ -1,5 +1,5 @@
 setup.py
-bin/cmn_
+bin/cmn
 langz/__init__.py
 langz.egg-info/PKG-INFO
 langz.egg-info/SOURCES.txt
