@@ -1,0 +1,13 @@
+import sys
+from argparse import ArgumentParser, FileType
+import cmn
+
+parser = cmn.arg_parser()
+args = parser.parse_args()
+
+if args.command == 'pinyin':
+    CmnPinyinCommand(args).execute()
+elif args.command == 'search':
+    CmnSearchCommand(args).execute()
+
+# vim: set filetype=python:

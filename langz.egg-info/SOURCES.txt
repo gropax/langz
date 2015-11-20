@@ -1,0 +1,8 @@
+setup.py
+bin/cmn_
+langz/__init__.py
+langz.egg-info/PKG-INFO
+langz.egg-info/SOURCES.txt
+langz.egg-info/dependency_links.txt
+langz.egg-info/not-zip-safe
+langz.egg-info/top_level.txt
