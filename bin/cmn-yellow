@@ -1,0 +1,77 @@
+import sys
+from argparse import ArgumentParser, FileType
+from robobrowser import RoboBrowser
+
+
+parser = ArgumentParser(description="Query YellowBridge online dictionary")
+parser.add_argument('infile', nargs='?', type=FileType('r'), default=sys.stdin)
+parser.add_argument('-o', '--outfile', type=FileType('w'), default=sys.stdout)
+parser.add_argument('-f', '--format', default='%s\t%t\t%d')
+
+args = parser.parse_args()
+
+
+TABLE_TITLES = {
+    'English': 'definition',
+    'See': 'see_also',
+    'Traditional': 'traditional',
+    'Pinyin': 'pinyin',
+    'Cantonese': 'jyutping',
+    'Effective': 'tone_sandhi',
+    'Measure': 'quantifier',
+    'Part': 'category',
+}
+
+INTERPOLATE = {
+    'simplified': '%s',
+    'definition': '%d',
+    'traditional': '%t',
+    'pinyin': '%p',
+    'quantifier': '%q',
+    'category': '%c',
+    'jyutping': '%j',
+}
+
+browser = RoboBrowser(history=True, user_agent="Mozilla/5.0", parser='lxml')
+
+for l in args.infile:
+    out = ""
+
+    w = l.strip()
+    if w:
+        url = "http://www.yellowbridge.com/chinese/dictionary.php?word=%s" % w
+        browser.open(url)
+
+        data = {}
+
+        data['simplified'] = browser.select('.mainDictChar')[0].text
+
+        table = browser.select('#mainData tr')
+        for tr in table:
+            title, content = [td.text for td in tr.select('td')]
+            for t, c in TABLE_TITLES.items():
+                if title.startswith(t):
+                    data[c] = content
+                    break
+
+        if data['traditional'].startswith('Same'):
+            data['traditional'] = data['simplified']
+
+        if data['tone_sandhi'].startswith('Same'):
+            data['tone_sandhi'] = data['pinyin']
+
+        if data['category']:
+            data['category'] = data['category'][1]
+
+        if data['quantifier']:
+            qlist = data['quantifier'].split(', ')
+            if len(qlist) > 1:
+                data['quantifier'] = "[%s]" % "|".join(qlist)
+
+        out = args.format
+        for k, i in INTERPOLATE.items():
+            out = out.replace(i, data[k])
+
+    args.outfile.write("%s\n" % out)
+
+# vim: set filetype=python:
