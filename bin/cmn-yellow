@@ -1,6 +1,7 @@
 import sys
 from argparse import ArgumentParser, FileType
 from robobrowser import RoboBrowser
+from langz.cmn import YellowBridgeSpider
 
 
 parser = ArgumentParser(description="Query YellowBridge online dictionary")
@@ -9,18 +10,6 @@ parser.add_argument('-o', '--outfile', type=FileType('w'), default=sys.stdout)
 parser.add_argument('-f', '--format', default='%s\t%t\t%d')
 
 args = parser.parse_args()
-
-
-TABLE_TITLES = {
-    'English': 'definition',
-    'See': 'see_also',
-    'Traditional': 'traditional',
-    'Pinyin': 'pinyin',
-    'Cantonese': 'jyutping',
-    'Effective': 'tone_sandhi',
-    'Measure': 'quantifier',
-    'Part': 'category',
-}
 
 INTERPOLATE = {
     'simplified': '%s',
@@ -39,34 +28,14 @@ for l in args.infile:
 
     w = l.strip()
     if w:
-        url = "http://www.yellowbridge.com/chinese/dictionary.php?word=%s" % w
-        browser.open(url)
+        spider = YellowBridgeSpider(browser, {'simplified': w})
+        data = spider.crawl()
 
-        data = {}
-
-        data['simplified'] = browser.select('.mainDictChar')[0].text
-
-        table = browser.select('#mainData tr')
-        for tr in table:
-            title, content = [td.text for td in tr.select('td')]
-            for t, c in TABLE_TITLES.items():
-                if title.startswith(t):
-                    data[c] = content
-                    break
-
-        if data['traditional'].startswith('Same'):
-            data['traditional'] = data['simplified']
-
-        if data['tone_sandhi'].startswith('Same'):
-            data['tone_sandhi'] = data['pinyin']
-
-        if data['category']:
-            data['category'] = data['category'][1]
-
-        q = data.setdefault('quantifier', '个')
-        qlist = q.split(', ')
+        qlist = data['quantifier']
         if len(qlist) > 1:
             data['quantifier'] = "[%s]" % "|".join(qlist)
+        else:
+            data['quantifier'] = qlist[0]
 
         out = args.format
         for k, i in INTERPOLATE.items():
