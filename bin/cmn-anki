@@ -1,13 +1,16 @@
 import sys
 from pypinyin import pinyin
 import jieba
+import jieba.posseg as pseg
 from argparse import ArgumentParser, FileType
+from langz.cmn import YellowBridgeSpider
+from robobrowser import RoboBrowser
 
 
 parser = ArgumentParser(description="Query YellowBridge online dictionary")
 parser.add_argument('infile', nargs='?', type=FileType('r'), default=sys.stdin)
 parser.add_argument('-o', '--outfile', type=FileType('w'), default=sys.stdout)
-parser.add_argument('-f', '--format', type=str, default="stpdea")
+parser.add_argument('-f', '--format', type=str, default="sd@")
 
 parser.add_argument('--no-pinyin', action='store_false', dest="pinyin",
                     help="do not generate pinyin when missing")
@@ -19,6 +22,8 @@ args = parser.parse_args()
 
 # Do not print logging to stderr
 jieba.setLogLevel(60)
+
+browser = RoboBrowser(history=True, user_agent="Mozilla/5.0", parser='lxml')
 
 
 ANKI_FIELDS = ['simplified', 'traditional', 'pinyin', 'definition', 'example', 'audio']
@@ -33,6 +38,7 @@ FIELD_CODE = {
     'q': 'quantifier',
     'c': 'category',
     'j': 'jyutping',
+    '@': 'command',
 }
 
 class AnkiCard:
@@ -67,9 +73,20 @@ for l in args.infile:
         for i, c in enumerate(args.format):
             data[FIELD_CODE[c]] = fields[i]
 
+        cmd = data.get('command')
+        if cmd == '@q':
+            spider = YellowBridgeSpider(browser, {'simplified': data['simplified']})
+            qlist = spider.crawl().setdefault('quantifier', ['个'])
+            if len(qlist) > 1:
+                qstr = "[%s]" % "|".join(qlist)
+            else:
+                qstr = qlist[0]
+            data['simplified'] = "一%s%s" % (qstr, data['simplified'])
+
+        simp_words = pseg.cut(data['simplified'])
+
         if args.pinyin:
-            simp = data['simplified']
-            cut = " ".join(jieba.cut(simp))
+            cut = " ".join(w.word for w in simp_words)
             data.setdefault('pinyin', "".join(l[0] for l in pinyin(cut)))
 
         if args.audio:
