@@ -8,5 +8,5 @@ setup(name='langz',
       author_email='maximedelaudrin@gmail.com',
       license='MIT',
       packages=['langz'],
-      scripts=['bin/cmn', 'bin/cmn-yellow'],
+      scripts=['bin/cmn', 'bin/cmn-yellow', 'bin/cmn-pinyin', 'bin/cmn-anki'],
       zip_safe=False)

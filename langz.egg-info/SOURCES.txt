@@ -1,5 +1,7 @@
 setup.py
 bin/cmn
+bin/cmn-anki
+bin/cmn-pinyin
 bin/cmn-yellow
 langz/__init__.py
 langz.egg-info/PKG-INFO

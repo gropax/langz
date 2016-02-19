@@ -1,0 +1,35 @@
+import sys
+from argparse import ArgumentParser, FileType
+import cedict
+
+
+parser = ArgumentParser(description="Conversion between different pinyin formats")
+parser.add_argument('infile', nargs='?', type=FileType('r'), default=sys.stdin)
+parser.add_argument('-o', '--outfile', type=FileType('w'), default=sys.stdout)
+
+group = parser.add_mutually_exclusive_group(required=True)
+group.add_argument('-a', '--accent', action="store_true")
+group.add_argument('-n', '--number', action="store_true")
+group.add_argument('-r', '--remove', action="store_true")
+
+args = parser.parse_args()
+
+
+if args.accent:
+    proc = cedict.pinyinize
+elif args.number:
+    proc = cedict.depinyinize
+else:
+    def proc(s):
+        return u''.join([c for c in cedict.depinyinize(s)
+                           if not c.isdigit()])
+
+for l in args.infile:
+    out = ""
+    s = l.strip().decode('utf-8')
+    if s:
+        out = proc(s)
+
+    args.outfile.write("%s\n" % out)
+
+# vim: set filetype=python:

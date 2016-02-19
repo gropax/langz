@@ -1,0 +1,75 @@
+import sys
+from argparse import ArgumentParser, FileType
+
+
+parser = ArgumentParser(description="Query YellowBridge online dictionary")
+parser.add_argument('infile', nargs='?', type=FileType('r'), default=sys.stdin)
+parser.add_argument('-o', '--outfile', type=FileType('w'), default=sys.stdout)
+parser.add_argument('-f', '--format', type=str, default="stpdea")
+
+#group = parser.add_mutually_exclusive_group(required=True)
+#group.add_argument('-a', '--audio', action="store_true",
+                   #help="audio recognition flashcards")
+#group.add_argument('-g', '--graphic', action="store_true",
+                   #help="reading recognition flashcards")
+#group.add_argument('-p', '--production', action="store_true",
+                   #help="production flashcards")
+
+args = parser.parse_args()
+
+
+ANKI_FIELDS = ['simplified', 'traditional', 'pinyin', 'definition', 'example', 'sound']
+
+FIELD_CODE = {
+    's': 'simplified',
+    't': 'traditional',
+    'p': 'pinyin',
+    'd': 'definition',
+    'e': 'example',
+    'a': 'audio',
+    'q': 'quantifier',
+    'c': 'category',
+    'j': 'jyutping',
+}
+
+class AnkiCard:
+    @staticmethod
+    def format_field(field):
+        f = field
+        if '"' in f:
+            f = f.replace('"', '&quot;')
+        if "\t" in f or "\n" in f:
+            f = '"' + f + '"'
+        return f
+
+    def __init__(self, fields):
+        self.fields = fields
+
+    def format(self):
+        return "\t".join(self.format_field(f) for f in self.fields)
+
+
+flen = len(args.format)
+
+for l in args.infile:
+    out = ""
+
+    w = l.strip()
+    if w:
+        fields = w.split('\t')
+        if len(fields) < flen:
+            fields += [""] * (flen - len(fields))
+
+        data = {}
+        for i, c in enumerate(args.format):
+            data[FIELD_CODE[c]] = fields[i]
+
+        if not data.get('audio'):
+            data['audio'] = "[sound:%s.mp3]" % data['simplified']
+
+        card_fields = [data.get(k, "") for k in ANKI_FIELDS]
+        out = AnkiCard(card_fields).format()
+
+    args.outfile.write("%s\n" % out)
+
+# vim: set filetype=python:
