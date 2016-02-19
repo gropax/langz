@@ -63,10 +63,10 @@ for l in args.infile:
         if data['category']:
             data['category'] = data['category'][1]
 
-        if data['quantifier']:
-            qlist = data['quantifier'].split(', ')
-            if len(qlist) > 1:
-                data['quantifier'] = "[%s]" % "|".join(qlist)
+        q = data.setdefault('quantifier', '个')
+        qlist = q.split(', ')
+        if len(qlist) > 1:
+            data['quantifier'] = "[%s]" % "|".join(qlist)
 
         out = args.format
         for k, i in INTERPOLATE.items():
