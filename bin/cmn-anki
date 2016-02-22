@@ -12,8 +12,12 @@ parser.add_argument('infile', nargs='?', type=FileType('r'), default=sys.stdin)
 parser.add_argument('-o', '--outfile', type=FileType('w'), default=sys.stdout)
 parser.add_argument('-f', '--format', type=str, default="sd@")
 
+parser.add_argument('--no-traditional', action='store_false', dest="traditional",
+                    help="do not generate traditional when missing")
 parser.add_argument('--no-pinyin', action='store_false', dest="pinyin",
                     help="do not generate pinyin when missing")
+parser.add_argument('--no-definition', action='store_false', dest="definition",
+                    help="do not generate definition when missing")
 parser.add_argument('--no-audio', action='store_false', dest="audio",
                     help="do not add the audio field")
 
@@ -58,43 +62,119 @@ class AnkiCard:
         return "\t".join(self.format_field(f) for f in self.fields)
 
 
+def fetch_quantifiers(item):
+    #spider = YellowBridgeSpider(browser, {'simplified': item['simplified']})
+    items = []
+    spider = YellowBridgeSpider(browser, item)
+
+    qx = spider.crawl().setdefault('quantifier', ['个'])
+
+    for q in qx:
+        qstr = "一%s%s" % (q, item['simplified'])
+        items.append({'simplified': qstr, 'definition': item.get('definition', '')})
+
+    return items
+
+
 flen = len(args.format)
+
+# Parse file into items
+#
+items = []
 
 for l in args.infile:
     out = ""
-
     w = l.strip()
     if w:
         fields = w.split('\t')
         if len(fields) < flen:
             fields += [""] * (flen - len(fields))
 
-        data = {}
+        item = {}
         for i, c in enumerate(args.format):
-            data[FIELD_CODE[c]] = fields[i]
+            item[FIELD_CODE[c]] = fields[i]
 
-        cmd = data.get('command')
-        if cmd == '@q':
-            spider = YellowBridgeSpider(browser, {'simplified': data['simplified']})
-            qlist = spider.crawl().setdefault('quantifier', ['个'])
-            if len(qlist) > 1:
-                qstr = "[%s]" % "|".join(qlist)
-            else:
-                qstr = qlist[0]
-            data['simplified'] = "一%s%s" % (qstr, data['simplified'])
+        cmd = item.get('command')
+        item['command'] = cmd.split(':')
 
-        simp_words = pseg.cut(data['simplified'])
+        items.append(item)
 
-        if args.pinyin:
-            cut = " ".join(w.word for w in simp_words)
-            data.setdefault('pinyin', "".join(l[0] for l in pinyin(cut)))
 
-        if args.audio:
-            data.setdefault('audio', "[sound:%s.mp3]" % data['simplified'])
+# Expanded commands and missing fields
+#
+expanded = []
 
-        card_fields = [data.get(k, "") for k in ANKI_FIELDS]
-        out = AnkiCard(card_fields).format()
+while items:
+    item = items.pop(0)
+    cmd, *opts = item.get('command', [None])
+    typ = None
+
+    # Test or force types
+    #
+    if cmd == '!vr':
+        typ = 'vr'
+    elif cmd == '?vr':
+        # @todo
+        pass
+    elif cmd == '!vo':
+        typ = 'vo'
+    elif cmd == '?vo':
+        # @todo
+        pass
+
+    # Expansion commands (and new lines)
+    #
+    if cmd == '+q':  # Fetch quantifiers from YellowBridge
+        items = fetch_quantifiers(item) + items
+        # discard original line
+        continue
+
+    elif typ == 'vo' and '+q' in opts:
+        verb, *obj = item['simplified']
+        o_item = {'simplified': "".join(obj)}
+        items = fetch_quantifiers(o_item) + items
+
+    elif cmd == '+lv':
+        # @todo fetch light verb
+        pass
+
+    item['segmented'] = pseg.cut(item['simplified'])
+
+    # @todo
+    if args.traditional:
+        item['traditional'] = '@todo'
+
+    if args.pinyin:
+        if typ == 'vr':
+            verb, *res = item['simplified']
+            chars = "-".join([verb, "".join(res)])
+        elif typ == 'vo':
+            verb, *obj = item['simplified']
+            chars = "//".join([verb, "".join(obj)])
+        else:
+            chars = " ".join(w.word for w in item['segmented'])
+
+        item.setdefault('pinyin', "".join(l[0] for l in pinyin(chars)))
+
+    # @todo
+    if args.definition:
+        item['definition'] = '@todo'
+
+    if args.audio:
+        item.setdefault('audio', "[sound:%s.mp3]" % item['simplified'])
+
+    expanded.append(item)
+
+
+# Generate cards and write to stdout
+#
+for item in expanded:
+    card_fields = [item.get(k, "") for k in ANKI_FIELDS]
+    out = AnkiCard(card_fields).format()
 
     args.outfile.write("%s\n" % out)
+
+
+exit(0)
 
 # vim: set filetype=python:
